@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint (syntax + import check)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Syntax check
+        run: |
+          python -m compileall -q quota_guard/ tests/
+
+      - name: Import check
+        run: |
+          python -c "import quota_guard; print('quota_guard version:', quota_guard.__version__)"
+
+      - name: Verify CLI entry point
+        run: |
+          python -m quota_guard --help
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --ignore=tests/e2e
+
+  e2e-test:
+    name: End-to-end simulation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run end-to-end simulation
+        run: |
+          cd tests
+          mkdir -p /tmp/quotaguard_test
+          PYTHONIOENCODING=utf-8 PYTHONPATH=.. python -m quota_guard.resume \
+            --monitor-cmd "python e2e/fake_signal_emitter.py --base-dir /tmp/quotaguard_test --pause-after 3 --resume-after 5 --max-cycles 3 --duration 30" \
+            --initial-cmd "python e2e/fake_claude.py --tool-sleep 3 --rounds 8" \
+            --claude-cmd "python e2e/fake_claude.py --tool-sleep 3 --rounds 8" \
+            --max-rounds 3 --clean-on-start 2>&1 | tee /tmp/e2e_output.log
+
+      - name: Verify e2e output
+        run: |
+          grep -q "RESUME.flag detected" /tmp/e2e_output.log
+          grep -q "PAUSE.flag detected" /tmp/e2e_output.log
+          echo "E2E test passed: all expected signals observed"
+
+  security-check:
+    name: Security & secrets check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for accidentally committed secrets
+        run: |
+          echo "Checking for API key patterns in tracked files..."
+          if grep -rEn 'sk-cp-[A-Za-z0-9_-]{40,}' --include='*.py' --include='*.md' --include='*.json' --include='*.yml' --include='*.toml' --include='*.bat' .; then
+            echo "ERROR: possible API key found in tracked files"
+            exit 1
+          fi
+          if grep -rEn 'sk-ant-[A-Za-z0-9_-]{40,}|sk-openai-[A-Za-z0-9_-]{40,}|gho_[A-Za-z0-9]{30,}' --include='*.py' --include='*.md' --include='*.json' .; then
+            echo "ERROR: possible API key found in tracked files"
+            exit 1
+          fi
+          echo "No secrets found."
+
+      - name: Verify .gitignore covers .env and runtime artifacts
+        run: |
+          for pattern in '.env' '__pycache__' '.quotaguard' 'PROGRESS.md' 'BREAKPOINT.md' '*.log'; do
+            if ! grep -q "$pattern" .gitignore; then
+              echo "ERROR: .gitignore missing pattern: $pattern"
+              exit 1
+            fi
+          done
+          echo ".gitignore coverage OK."

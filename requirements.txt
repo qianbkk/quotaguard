@@ -1,0 +1,13 @@
+# ============================================================
+#  QuotaGuard runtime dependencies
+#  Install:  pip install -r requirements.txt
+# ============================================================
+
+# Core —— required for monitor + hook + resume
+requests>=2.28
+python-dotenv>=1.0
+
+# Optional: only needed if you use the local proxy
+# (for Codex / Cursor / MiniMax Agent — Claude Code only needs the hook)
+fastapi>=0.100
+uvicorn[standard]>=0.23

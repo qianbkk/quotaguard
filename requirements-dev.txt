@@ -1,0 +1,10 @@
+# ============================================================
+#  QuotaGuard development / testing dependencies
+#  Install:  pip install -r requirements-dev.txt
+# ============================================================
+
+-r requirements.txt
+
+# End-to-end simulation
+pytest>=7
+pytest-timeout>=2
