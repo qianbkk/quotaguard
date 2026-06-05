@@ -1,0 +1,49 @@
+{
+  "$comment": "Claude Code 暂停/恢复 hook 配置 —— PreToolUse 检测 PAUSE.flag 优雅阻塞",
+  "$install": "把此文件复制到项目根的 .claude/settings.json (Claude Code 会自动加载)",
+  "$how_it_works": [
+    "1. monitor.py 写 .claude/PAUSE.flag (含触发时间/原因/余量)",
+    "2. Claude 即将执行任何工具 → PreToolUse hook 跑 pretool_pause_check.py",
+    "3. 看到 PAUSE.flag → stderr 提示 + exit 2 → 工具调用被阻塞",
+    "4. Claude 读 BREAKPOINT.md, 写 PROGRESS.md, 主动 /exit",
+    "5. orchestrator 检测到 Claude 退出 → 等待 PAUSE.flag 被删除",
+    "6. monitor 检测到 end_time 跳 5h → 删 PAUSE.flag + 写 RESUME.flag",
+    "7. orchestrator 再启动 `claude --continue` → SessionStart hook 注入 PROGRESS.md",
+    "8. Claude 无缝衔接续上任务"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|Read|Glob|Grep|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretool_pause_check.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/sessionstart_inject.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_log_progress.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

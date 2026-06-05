@@ -1,0 +1,109 @@
+# ============================================================
+#  Secrets & credentials —— 严禁入仓
+# ============================================================
+.env
+.env.*
+*.env
+!.env.example
+secrets.json
+*.pem
+*.key
+config.local.*
+credentials.*
+
+# ============================================================
+#  Runtime artifacts —— 运行时产生，git 不应追踪
+# ============================================================
+.quotaguard/           # monitor 写的状态、PAUSE/RESUME 哨兵
+PROGRESS.md            # Claude 写的进度
+BREAKPOINT.md          # monitor 写的断点摘要
+STOP.flag
+RESUME.flag
+*.log
+*.log.*
+
+# ============================================================
+#  Python —— 字节码、虚拟环境、缓存
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+.ENV/
+
+# Poetry
+poetry.lock
+
+# pytest
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.cache
+coverage.xml
+*.cover
+
+# mypy
+.mypy_cache/
+
+# ============================================================
+#  IDE & editors
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================================
+#  OS-specific
+# ============================================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================
+#  Project-specific
+# ============================================================
+# 仿真测试运行时产生的临时数据
+tests/e2e/.quotaguard/
+tests/e2e/PROGRESS.md
+tests/e2e/*.log
+
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Node (if any subprojects add JS)
+node_modules/
+package-lock.json
+yarn.lock
