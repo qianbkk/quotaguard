@@ -75,6 +75,8 @@ class QuotaState:
                       low_threshold: float = 15.0,
                       critical_threshold: float = 3.0) -> "QuotaState":
         s = cls()
+        s.low_threshold = low_threshold
+        s.critical_threshold = critical_threshold
         s.remains_pct = snap.remains_pct or 0.0
         s.remains_time_ms = snap.remains_time_ms or 0
         s.weekly_pct = snap.weekly_pct or 100.0

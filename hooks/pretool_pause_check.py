@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Claude Code PreToolUse hook —— 检测 PAUSE.flag 优雅阻塞。
 
+路径约定（必须与 quota_guard.monitor 一致）：
+  默认读 ~/.quotaguard/PAUSE.flag（HOME 下的 QuotaGuard 数据目录）
+  可通过环境变量 QUOTAGUARD_PAUSE / QUOTAGUARD_RESUME 覆盖
+
 行为：
-- 读 $CLAUDE_PROJECT_DIR/.claude/PAUSE.flag（不存在 → 放行）
+- 不存在 PAUSE.flag → 放行（exit 0）
 - 存在 → 读元数据，stderr 输出给 Claude，exit 2 阻塞当前工具
 - Claude 看到 stderr 后会自己写 PROGRESS.md / BREAKPOINT.md 然后退出
 
@@ -21,9 +25,16 @@ try:
 except Exception:
     pass
 
+# 路径解析顺序（按优先级）：
+#   1) 环境变量 QUOTAGUARD_PAUSE / QUOTAGUARD_RESUME（最稳）
+#   2) 项目根 .quotaguard/PAUSE.flag（与 monitor CLI 默认一致）
+#   3) HOME 下的 ~/.quotaguard/PAUSE.flag（fallback）
 PROJECT_DIR = Path(os.environ.get("CLAUDE_PROJECT_DIR", "."))
-PAUSE_FILE = PROJECT_DIR / ".claude" / "PAUSE.flag"
-RESUME_FILE = PROJECT_DIR / ".claude" / "RESUME.flag"
+_quota_dir = Path(os.environ.get("QUOTAGUARD_DIR") or (PROJECT_DIR / ".quotaguard"))
+PAUSE_FILE = Path(os.environ.get("QUOTAGUARD_PAUSE") or (_quota_dir / "PAUSE.flag"))
+RESUME_FILE = Path(os.environ.get("QUOTAGUARD_RESUME") or (_quota_dir / "RESUME.flag"))
+
+# 兼容旧约定：项目 .claude/ 下的断点/进度文件
 BREAKPOINT_FILE = PROJECT_DIR / "BREAKPOINT.md"
 PROGRESS_FILE = PROJECT_DIR / "PROGRESS.md"
 
@@ -34,7 +45,7 @@ if PAUSE_FILE.exists():
         meta = {"triggered_at": "?", "reason": "?"}
     triggered = meta.get("triggered_at", "?")
     reason = meta.get("reason", "MiniMax quota low")
-    remains = meta.get("remains_percent", "?")
+    remains = meta.get("remains_percent", meta.get("general_5h_percent", "?"))
     sys.stderr.write(
         f"PAUSED at {triggered}: {reason} (remains={remains}%)\n"
         f"ACTION REQUIRED:\n"
@@ -52,9 +63,7 @@ if RESUME_FILE.exists():
     except Exception:
         meta = {}
     sys.stderr.write(
-        f"RESUMED at {meta.get('resumed_at', '?')}: quota restored "
-        f"(remains={meta.get('remains_percent', '?')}%, "
-        f"end_time={meta.get('remains_time_ms', '?')}ms)\n"
+        f"RESUMED at {meta.get('resumed_at', meta.get('refreshed_at', '?'))}: quota restored\n"
     )
 
 sys.exit(0)

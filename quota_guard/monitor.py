@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 import argparse
+import json
 import os
 import signal
 import sys
@@ -145,6 +146,18 @@ def run_monitor(
             if not state_file.is_paused():
                 state.mark_stop()
                 state_file.write_pause(reason=f"5h remaining {state.remains_pct}% <= {critical_threshold}%")
+                # 在 PAUSE.flag 里同时写触发时刻、剩余%、阈值（让 hook 显示完整）
+                from pathlib import Path as _P
+                _P(state_file.pause_path).write_text(
+                    json.dumps({
+                        "triggered_at": time.time(),
+                        "reason": f"5h remaining {state.remains_pct}% <= {critical_threshold}%",
+                        "remains_percent": state.remains_pct,
+                        "threshold": critical_threshold,
+                        "end_time_ms": state.end_time_ms,
+                    }, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
                 log(f"🛑 STOP emitted (≤ {critical_threshold}%)", on_log)
                 # 重置 critical 计数（避免重复写）
             # 已经 STOP：检查是否真刷新
@@ -175,9 +188,9 @@ def cmd_monitor(args: argparse.Namespace) -> int:
     provider = MinMaxProvider.from_env(env_file=env_file if env_file.exists() else None)
 
     state_file = StateFile(
-        state_path=Path(args.state_file),
-        pause_path=Path(args.pause_file),
-        resume_path=Path(args.resume_file) if args.resume_file else None,
+        state_path=Path(args.state_file).expanduser(),
+        pause_path=Path(args.pause_file).expanduser(),
+        resume_path=Path(args.resume_file).expanduser() if args.resume_file else None,
     )
 
     return run_monitor(

@@ -58,6 +58,16 @@ def is_critical(state_path: Path) -> tuple[bool, Optional[int]]:
 def build_app(state_file: Path, real_base: str = REAL_BASE) -> FastAPI:
     app = FastAPI(title="QuotaGuard Proxy")
 
+    # /quotaguard/status 必须在 catch-all 之前注册，否则被遮蔽
+    @app.get("/quotaguard/status")
+    async def status():
+        if state_file.exists():
+            try:
+                return json.loads(state_file.read_text(encoding="utf-8"))
+            except Exception as e:
+                return {"error": str(e)}
+        return {"error": "no state file"}
+
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def proxy(path: str, request: Request):
         # 配额检查
@@ -107,15 +117,6 @@ def build_app(state_file: Path, real_base: str = REAL_BASE) -> FastAPI:
                 status_code=502,
                 content={"error": {"type": "proxy_error", "message": str(e)}},
             )
-
-    @app.get("/quotaguard/status")
-    async def status():
-        if state_file.exists():
-            try:
-                return json.loads(state_file.read_text(encoding="utf-8"))
-            except Exception as e:
-                return {"error": str(e)}
-        return {"error": "no state file"}
 
     return app
 
